@@ -1,2 +1,3 @@
 include LICENSE
 include README.md
+include cwrap.py.1
