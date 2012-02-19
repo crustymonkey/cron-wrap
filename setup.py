@@ -17,9 +17,10 @@ def installMan(manpage):
         man1 = os.path.join(d , 'man1')
         if os.path.isdir(d) and os.path.isdir(man1):
             # We have found a man directory, install!
-            print 'Copying %s to %s' % (manpage , os.path.join(man1 , manpage))
-            shutil.copyfile(manpage , man1)
-            os.system('gzip -9 %s' % os.path.join(man1 , manpage))
+            dest = os.path.normpath(os.path.join(man1 , manpage))
+            print 'Copying %s to %s' % (manpage , dest)
+            shutil.copyfile(manpage , dest)
+            os.system('gzip -9 %s' % dest)
 
 setup(name='cron-wrap' ,
     version=cwv ,
