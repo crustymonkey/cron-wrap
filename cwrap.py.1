@@ -4,20 +4,183 @@ cwrap.py \- A cron job wrapper used to suppress output
 .SH SYNOPSIS
 .B cwrap.py [options] (command [cmd-arg [cmd-arg ...]] | 'command [cmd-arg [cmd-arg ...]]')
 .SH DESCRIPTION
-.nf
-/path/to/cwrap.py command --arg1 --arg2
-.fi
-todo
+"Obviously, you're not a golfer".  But you are probably a sysadmin.
 .PP
-section 2
+The 
+.I cwrap.py
+script is meant to be used as a wrapper for cron jobs.  The idea
+here is that you use this script to wrap whatever would be a normal cronjob
+for you to perform functions based on what options are specified.  I think
+this is best explained with an example.
+.PP
+I have a cronjob that runs every minute.  First, I don't want
+"overlap", a second instance is run while the first one is still running,
+if a single run takes a long time.  Solved.  The nature of my cronjob (just
+a script that is being run) is such that there will be an occasional failure,
+but an occasional failure, in this case, can be ignored.  Instead, I only want
+to know when the script has failed 5 times in a row.  Solved.  By default,
+cwrap.py will also swallow all the output for the occasional fails, but I
+at least want a record of those failures so that I can determine whether
+the intermittent fails are happening more frequently and constitute a
+different problem.  Solved (by turning on the syslog option).
+.PP
+This script may not be useful for everyone, but for some out there, it will
+save you a lot of time, effort and probably emails in your inbox.
+.PP
+See the EXAMPLE section for a short example
+.SH FAILURES
+The concept of a failure is simple.  The exit code of the script that cwrap.py
+is running must be non-zero for cwrap.py to call it a "failure".
 .SH OPTIONS
-.TP
-\-h
+.SS "General Options"
+.TP 8
+.BR \-h ", " \-\-help
 display a short help
+.TP
+.BR \-V "," \-\-version
+Print the version number and exit [default: False]
+.SS "State Options"
+.TP 8
+.BI \-d\  PATH \fR,\ \fB\-\-state\-directory= PATH
+The directory to write the state file to.  There is a state file created for
+each command-line that
+.I cwrap.py
+is running.  This specifies the directory to create those in. 
+[default: /var/tmp]
+.TP
+.BI \-F\  FILE \fR,\ \fB\-\-lock\-file= FILE
+Set a specific lock file to use.  This is useful when running 2 different 
+scripts, or the same script with different command-line opts, that cannot 
+run at the same time. By default, a lock file will be automatically 
+generated.  [default: <auto-gen lockfile>]
+.SS "Retry Options"
+.TP 8
+.BI \-r\  INT \fR,\ \fB\-\-num\-retries= INT
+The number of times to retry this if a previous instance is running.  
+The script will retry every "-s" seconds if this is greater than zero. 
+This, like all the retry options, only pertains to retries of
+.I cwrap.py
+when it encounters a lock file.  The default here is not to retry at all, and
+instead just die.  [default: 0]
+.TP
+.BI \-s\  INT \fR,\ \fB\-\-retry\-seconds= INT
+This is the number of seconds between retries.  This only matters if the 
+.B \-\-num\-retries
+option is set to greater than zero. [default: 10]
+.TP
+.BR \-i ", " \-\-ignore\-retry\-fails
+Ignore the failures which occur because this tried to run while a 
+previous instance was still running.  Basically, an error will not be 
+printed if the 
+.B \-\-num\-retries
+are exceeded. The default behavior is to treat this as a failure.  
+[default: False]
+.SS "Failure Options"
+.TP 8
+.BI \-n\  INT \fR,\ \fB\-\-num\-fails= INT
+The number of consecutive failures that must occur before a report is 
+printed.  The behavior of
+.I cwrap.py
+can be set to store all of the failures until this number is reached.  At that
+point, all of the consecutive failures will be printed.  [default: 1]
+.TP
+.BR \-f ", " \-\-first\-fail
+The default is to print a failure report only when a multiple of the 
+.B \-\-num\-fails
+threshold is reached. If this is set, a report will 
+.B also
+be printed on the first failure.  Note that this really only matters if
+you set the
+.B \-\-num\-fails
+greater than 1.  [default: False]
+.SS "Command Options"
+.TP 8
+.BI \-p\  CMD_PATH \fR,\ \fB\-\-path= CMD_PATH
+Use this for command path instead of the environment $PATH.  This will be set
+to the environment PATH of whatever user is running this, or whatever the
+PATH variable is set to in your crontab.
+.TP
+.BR \-g ", " \-\-single\-string
+This says that you are passing in a command line as a single string.  
+This means that the entire command (with args) MUST be encased in quotes!  
+This is handy if you want to encapsulate a pipe ("|") in your command 
+to be run: 
 .PP
-.SH EXIT STATUS
-The exit status of this itself should be ignored.  
+.nf
+"cat /tmp/file | grep stuff"  
+.fi
+.PP
+That would be passed directly, as a string, to a subshell for execution.  This
+allows for a lot of flexibility in how you use this. By default, the
+command is interpretted as it is "seen". [default: False]
+.TP
+.BI \-t\  INT \fR,\ \fB\-\-timeout= INT
+The number of seconds to allow the your command to run before terminating.  
+Set to zero to disable timeouts.  This is the length of time that
+.I cwrap.py
+will allow the command to run before
+.I cwrap.py
+terminates it.  The default is to let it run forever. [default: 0]
+.TP
+.BR \-q ", " \-\-quiet
+Only output error reports.  If this is set and the command runs successfully, 
+nothing will be printed, even if the command had stdout or stderr output. 
+The default is to print any output from the command.  If you are only
+interested in error output, just set this. [default: False]
+.SS "Syslog Options"
+.TP 8
+.BR \-S ", " \-\-syslog
+Turn on syslogging.  This will log 
+.B all 
+failures to syslog. This is useful for diagnosing intermittent issues that 
+don't necessarily reach the 
+.B --num-fails 
+limit.  See 
+.B \-C 
+and 
+.B \-P 
+for facility and priority options [default: False]
+.TP
+.BI \-C\  FACILITY \fR,\ \fB\-\-syslog\-facility= FACILITY
+The syslog facility to use.  See the facility section in 
+.I man syslog 
+for a list of choices. You must use  
+.B \-\-syslog 
+with this. [default: LOG_LOCAL7]
+.TP
+.BI \-P\  PRIORITY \fR,\ \fB\-\-syslog\-priority= PRIORITY
+Sets the priority for the syslog messages. See the level section in 
+.I man syslog 
+for a list of choices.  You must use 
+.B \-\-syslog
+with this. [default: LOG_INFO]
+.SH EXAMPLE
+Here is a short example of how you would run a cron job with
+.I cwrap.py.
+.PP
+For the purpose of this example, we'll say that the normal cronjob is run as
+.PP
+.nf
+cron.sh -a do_stuff
+.fi
+.PP
+Let's say that we always want to see the first failure in a string of
+failures (-f).  Beyond the first failure, we don't want to be notified until
+the 10th consecutive failure (-n 10).  This script can take a while to run so
+I want any other runs to retry two times (-r 2), but if it wasn't able to run
+because another instance was running, I don't want to hear about it (-i).  I
+also don't want to see any normal output from it, but just when it fails (-q).
+Last, I want
+.B all
+errors to be logged to syslog (-S) under LOCAL1 (-C LOG_LOCAL1).  Here would
+be the example:
+.PP
+.nf
+cwrap.py -fSiq -n 10 -r 2 -C LOG_LOCAL1 cron.sh -a do_stuff
+.fi
 .SH AUTHOR
 Jay Deiman (admin (at) splitstreams.com)
+.PP
+http://stuffivelearned.org
 .SH SEE ALSO
 cron(8), crontab(1), crontab(5)
