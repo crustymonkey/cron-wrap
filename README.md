@@ -27,19 +27,19 @@ Just follow the basic install practice for a Python package.
 
 1. If you have a .tar.gz, extract that first
         
-        tar -xvzf cron-wrap*.tar.gz
+    tar -xvzf cron-wrap*.tar.gz
 
 2. Now, just cd into the directory and install it
 
-        cd cron-wrap*
-        python setup.py install
+    cd cron-wrap*
+    python setup.py install
 
 This should install the script in either /usr/bin or /usr/local/bin depending
 on your platform.  A man page should also be installed.
 
 You can also install this using *pip* or *easy_install*
 
-        pip install cron-wrap
+    pip install cron-wrap
 
 ## DOCUMENTATION ##
 You have a few options here.  Run the script with either "-h" or "--help" to
