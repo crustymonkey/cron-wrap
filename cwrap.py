@@ -24,7 +24,7 @@ import sys , time , os , signal , syslog
 DEBUG = False
 STATEFILE = None
 LOGPRI = 0
-__version__ = '0.4.1'
+__version__ = '0.4.2'
 
 # File creation error exit code
 E_FC = 1
