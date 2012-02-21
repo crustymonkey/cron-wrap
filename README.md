@@ -37,6 +37,10 @@ Just follow the basic install practice for a Python package.
 This should install the script in either /usr/bin or /usr/local/bin depending
 on your platform.  A man page should also be installed.
 
+You can also install this using *pip* or *easy_install*
+
+        pip install cron-wrap
+
 ## DOCUMENTATION ##
 You have a few options here.  Run the script with either "-h" or "--help" to
 see a list of all the options with a brief description.  Otherwise, 
