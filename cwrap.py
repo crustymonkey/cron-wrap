@@ -24,7 +24,7 @@ import sys , time , os , signal , syslog
 DEBUG = False
 STATEFILE = None
 LOGPRI = 0
-__version__ = '0.4.2'
+__version__ = '0.4.3'
 
 # File creation error exit code
 E_FC = 1
@@ -288,7 +288,9 @@ class CommandState(object):
             self.lastRunExitCode = -1
             self.lastRunStdout = ''
             self.lastRunStderr = ''
-            self.lastRunPyError = str(e)
+            import traceback
+            t = traceback.format_exc()
+            self.lastRunPyError = '%s\n%s' % (str(e) , t)
             self._procFail()
             return False
         self.lastRunRunTime = time.time() - start
