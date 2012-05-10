@@ -24,7 +24,7 @@ import sys , time , os , signal , syslog
 DEBUG = False
 STATEFILE = None
 LOGPRI = 0
-__version__ = '0.4.3'
+__version__ = '0.4.4'
 
 # File creation error exit code
 E_FC = 1
@@ -255,6 +255,7 @@ class CommandState(object):
         self.opts = opts
         self.cmdList = cmdList
         self._reset()
+        self._ph = None
 
     def getNumFails(self):
         return len(self.failures)
@@ -265,7 +266,6 @@ class CommandState(object):
         Performs this run and prints an error report if necessary.
         """
         start = self.lastRunStartTime = time.time()
-        ph = None
         stdout = ''
         stderr = ''
         if self.opts.timeout:
@@ -275,11 +275,12 @@ class CommandState(object):
             signal.alarm(self.opts.timeout)
         try:
             if self.opts.singStr:
-                ph = sp.Popen(self.cmdList[0] , shell=True , stdout=sp.PIPE ,
-                     stderr=sp.PIPE)
+                self._ph = sp.Popen(self.cmdList[0] , shell=True , 
+                    stdout=sp.PIPE , stderr=sp.PIPE)
             else:
-                ph = sp.Popen(self.cmdList , stdout=sp.PIPE , stderr=sp.PIPE)
-            stdout , stderr = ph.communicate()
+                self._ph = sp.Popen(self.cmdList , stdout=sp.PIPE , 
+                    stderr=sp.PIPE)
+            stdout , stderr = self._ph.communicate()
             if self.opts.timeout:
                 # If we get here, disable the alarm
                 signal.alarm(0)
@@ -294,11 +295,11 @@ class CommandState(object):
             self._procFail()
             return False
         self.lastRunRunTime = time.time() - start
-        self.lastRunExitCode = ph.returncode
+        self.lastRunExitCode = self._ph.returncode
         self.lastRunStdout = stdout
         self.lastRunStderr = stderr
         self.lastRunPyError = ''
-        if ph.returncode == 0:
+        if self._ph.returncode == 0:
             # We have a successful run, reset everything and then just 
             # print the stdout and stderr vals
             self._reset()
@@ -314,6 +315,9 @@ class CommandState(object):
         This is just an alarm signal handler to handle the timeout specified
         on the command line.
         """
+        self._ph.terminate()
+        if self._ph.poll() is None:
+            self._ph.kill()
         raise CmdTimeout('Command reached timeout of %d seconds' % 
             self.opts.timeout)
 
