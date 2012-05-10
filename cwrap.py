@@ -261,6 +261,15 @@ class CommandState(object):
         return len(self.failures)
     NumFails = property(getNumFails)
 
+    def cleanup(self):
+        try:
+            self._ph.terminate()
+            if self._ph.poll() is None:
+                self._ph.kill()
+        except:
+            pass
+        self._ph = None
+
     def run(self):
         """
         Performs this run and prints an error report if necessary.
@@ -576,6 +585,7 @@ def main():
     # Set any new command line opts
     comSt.opts = opts
     comSt.run()
+    comSt.cleanup()
     stFh.saveObject(comSt)
     stFh.close()
     os.environ['PATH'] = oldPath
