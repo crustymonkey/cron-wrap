@@ -302,7 +302,7 @@ class CommandState(object):
             if not isinstance(e , CmdTimeout):
                 import traceback
                 t = traceback.format_exc()
-            self.lastRunPyError = '%s\n' % (e , t)
+            self.lastRunPyError = '%s\n%s' % (e , t)
             self._procFail()
             return False
         self.lastRunRunTime = time.time() - start
