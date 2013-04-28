@@ -1,4 +1,4 @@
-#!/usr/local/bin/python
+#!/usr/bin/python
 
 # This file is part of cron-wrap.
 # 
@@ -298,8 +298,9 @@ class CommandState(object):
             self.lastRunExitCode = -1
             self.lastRunStdout = ''
             self.lastRunStderr = ''
-            import traceback
-            t = traceback.format_exc()
+            if not isinstance(e , CmdTimeout):
+                import traceback
+                t = traceback.format_exc()
             self.lastRunPyError = '%s\n%s' % (str(e) , t)
             self._procFail()
             return False
