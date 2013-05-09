@@ -19,12 +19,12 @@ from optparse import OptionParser , OptionValueError , OptionGroup
 import cPickle as pickle
 from hashlib import md5
 import subprocess as sp
-import sys , time , os , signal , syslog
+import sys , time , os , signal , syslog , getpass
 
 DEBUG = False
 STATEFILE = None
 LOGPRI = 0
-__version__ = '0.4.5'
+__version__ = '0.5.0'
 
 # File creation error exit code
 E_FC = 1
@@ -429,6 +429,10 @@ def getOpts():
         'the command is interpreted and run.')
     gSyslog = OptionGroup(p , 'Syslog Options' , 'Options for logging errors '
         'via syslog in addition to normal output.')
+    gEmail = OptionGroup(p , 'Email Options' , 'If you wish to email other '
+        'addresses than what is in your crontab, you can specify these here. '
+        'You can also use an external SMTP server to send the email '
+        'instead of the local mailer.'
 
     p.add_option('-V' , '--version' , dest='version' , default=False ,
         action='store_true' ,
@@ -507,6 +511,32 @@ def getOpts():
         default='LOG_INFO' , help='Sets the priority for the syslog messages. '
         'See the level section in "man syslog" for a list of choices. You '
         'must use "--syslog" with this. [default: %default]')
+
+    gEmail.add_option('-M' , '--send-mail' , action='store_true' , 
+        default=False , help='Send an email from within cwrap itself.  This '
+        'option is *required* if you wish to use the email options below.  '
+        'Any other email options will be ignored if this option is not '
+        'specified.  Note that this can be used with -N to disable normal '
+        'output and just use cwrap to send an email [default: %default]')
+    gEmail.add_option('-N' , '--suppress-normal-output' , action='store_true' ,
+        default=False , help='Suppress the normal output to STDOUT that would '
+        'normally cause crond to send an email.  This can *only* be specified '
+        'if you are using cwrap to send an email (-M).  [default: %default]')
+    gEmail.add_option('-F' , '--email-from' , 
+        default='%s@localhost.localdomain' % getpass.getuser() ,
+        metavar='EMAIL_ADDR' , help='The email address to use as the sending '
+        'address.  It is advised that you set this to a non-default. '
+        '[default: %default]')
+    gEmail.add_option('-R' , '--email-recipient' , action='append' , 
+        default=[] , metavar='EMAIL_ADDR' , help='The recipient(s) to send '
+        'the email to. This option can be specified multiple times to send '
+        'to multiple addresses [default: %default]')
+    gEmail.add_option('-X' , '--smtp-server' , metavar='HOSTNAME|IP' ,
+        default='' , help='The SMTP server to use to send the email.  If '
+        'this option is not set, the local "sendmail" command will be used '
+        'instead [default: %default]')
+    gEmail.add_option('-T' , '--smtp-port' , type='int' , default=25 ,
+        metavar='INT' , help='The SMTP port to use [default: %default]')
 
     p.add_option_group(gState)
     p.add_option_group(gRetry)

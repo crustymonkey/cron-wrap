@@ -3,7 +3,7 @@
 from distutils.core import setup
 
 setup(name='cron-wrap' ,
-    version='0.4.7' ,
+    version='0.5.0' ,
     author='Jay Deiman' ,
     author_email='admin@splitstreams.com' ,
     url='http://stuffivelearned.org/doku.php?id=programming:python:cwrap' ,
