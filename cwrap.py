@@ -16,8 +16,10 @@
 # along with cron-wrap.  If not, see <http://www.gnu.org/licenses/>.
 
 from optparse import OptionParser , OptionValueError , OptionGroup
-import cPickle as pickle
 from hashlib import md5
+from cStringIO import StringIO
+from smtplib import SMTP , SMTP_SSL
+import cPickle as pickle
 import subprocess as sp
 import sys , time , os , signal , syslog , getpass
 
@@ -47,6 +49,9 @@ class FileCreationError(Exception):
         return '%s\n%s' % (self.msg , '\n'.join([str(e) for e in self.eList]))
 
 class CmdTimeout(Exception):
+    pass
+
+class MailError(Exception):
     pass
 
 # Define classes
@@ -347,26 +352,90 @@ class CommandState(object):
         if self.NumFails:
             if self.NumFails % self.opts.numFails == 0 or \
                     (self.opts.fstFail and self.NumFails == 1):
-                self._writeFails()
+                sioFail = self._getFailText()
+                if self.opts.mail:
+                    self._sendMail(sioFail.getvalue())
+                if not self.opts.suppressOutput:
+                    print sioFail.getvalue()
+                sioFail.close()
                 self._reset(False)
 
-    def _writeFails(self):
+    def _getFailText(self):
         """
-        This will actually write all the failures out to stdout
+        This will return the failure text in a StringIO object
         """
+        sio = StringIO()
         if self.NumFails == 1 and self.opts.fstFail:
             # We have a first fail
-            print 'The following command has failed for the first time and'
-            print 'the option to print a report for the first fail is set.'
+            sio.write('The following command has failed for the first '
+                'time and\n')
+            sio.write('the option to print a report for the first fail '
+                'is set.\n')
         else:
-            print 'The specified number of failures, %d,' % self.opts.numFails,
-            print 'has been reached for the following '
-            print 'command which has failed %d times in a row:' % self.NumFails
-        print '\n%s\n\nFAILURES:' % ' '.join(self.cmdList)
+            sio.write('The specified number of failures, %d,' % 
+                self.opts.numFails)
+            sio.write('has been reached for the following\n')
+            sio.write('command which has failed %d times in a row:' % 
+                self.NumFails)
+        sio.write('\n%s\n\nFAILURES:\n' % ' '.join(self.cmdList))
         for f in self.failures[-self.opts.numFails:]:
-            print f
+            sio.write(str(f))
+        return sio
+
+    def _getEmailHeaders(self):
+        """
+        Generates the email headers and returns the string
+        """
+        buf = StringIO()
+        buf.write('From: %s\r\n' % self.opts.mailFrom)
+        buf.write('Subject: %s\r\n' % self.opts.mailSubject)
+        buf.write('To: %s\r\n' % self.opts.mailRecips[0])
+        if len(self.opts.mailRecips) > 1:
+            buf.write('Cc: %s\r\n' % ','.join(self.opts.mailRecips[1:]))
+        buf.write('Content-Type: text/plain; charset="us-ascii"\r\n')
+        buf.write('MIME-Version: 1.0\r\n')
+        buf.write('\r\n')
+        ret = buf.getvalue()
+        buf.close()
+        return ret
+
+    def _sendEmail(self , failText):
+        """
+        Sends an email using the command line options
+        """
+        failText = self._getEmailHeaders() + failText
+        s = None
+        if not self.opts.smtpServer:
+            return self._sendSendmail(failText)
+        if self.opts.smtpSSL:
+            s = SMTP_SSL()
+        else:
+            s = SMTP()
+        s.connect(self.opts.smtpServer , self.opts.smtpPort)
+        s.ehlo()
+        if self.opts.smtpTLS:
+            s.starttls()
+        if self.opts.smtpUser:
+            s.login(self.opts.smtpUser , self.opts.smtpPass)
+        s.sendmail(self.opts.mailFrom , self.opts.mailRecips , failText)
+        s.quit()
+        
+    def _sendSendmail(self , failText):
+        """
+        Send an email using the local sendmail command
+        """
+        cmd = [self.opts.sendmail , '-f' , self.opts.mailFrom]
+        cmd.extend(self.opts.mailRecips)
+        p = sp.Popen(cmd , stdout=sp.PIPE , stderr=sp.PIPE)
+        stdout , stderr = p.communicate(failText)
+        if p.returncode != 0:
+            raise MailError('Error sending email with "sendmail":\n'
+                'STDOUT:\n%s\nSTDERR:\n%s\n' % (stdout , stderr))
 
     def _logFail(self , fail):
+        """
+        Logs the failure to syslog
+        """
         msg = 'CMD: %s; EXIT: %d; RUNTIME: %.02f; ' % (fail.command , 
             fail.exitCode , fail.runTime)
         if fail.pyError:
@@ -393,6 +462,49 @@ class CommandState(object):
     def _getEscCmd(self):
         cmd = "'%s'" % self.cmdList[0].replace("'" , "'\"'\"'")
         return cmd
+
+def handleEmailOpts(parser , opts):
+    """
+    Sanity checks against the input email options
+    """
+    if not opts.mail:
+        if opts.suppressOutput:
+            parser.error('You cannot suppress output unless you are using '
+                'cwrap to send email')
+        return
+    if not opts.mailRecips:
+        parser.error('You must specify at least one recipient if you are '
+            'using cwrap to send mail')
+    if opts.smtpCreds:
+        if not os.path.isfile(opts.smtpCreds):
+            parser.error('SMTP creds file, %s, does not exist' % opts.smtpCreds)
+        try:
+            creds = open(opts.smtpCreds).read()
+        except Exception , e:
+            parser.error('Error opening SMTP credentials file (%s): %s' % 
+                (opts.smtpCreds , e))
+        try:
+            user , passwd = creds.strip().split(':' , 1)
+        except:
+            parser.error('Invalid credentials in SMTP creds file '
+                '(%s). They should be in the form USERNAME:PASSWORD' % 
+                opts.smtpCreds)
+        opts.smtpUser = user
+        opts.smtpPass = passwd
+    if (opts.smtpUser and not opts.smtpPass) or \
+            (opts.smtpPass and not opts.smtpUser):
+        parser.error('If you specify an SMTP user or password, you must '
+            'specify both a user and a password')
+    if opts.smtpSSL and opts.smtpTLS:
+        parser.error('You cannot specify both SSL and TLS for email')
+    if not opts.smtpServer:
+        # Get the sendmail binary
+        sendmail = findInPath('sendmail')
+        if sendmail is None:
+            parser.error('You have specified that cwrap is to send email, '
+                'but I cannot find a sendmail binary in the PATH: %s' %
+                os.environ['PATH'])
+        opts.sendmail = sendmail
 
 # Utility functions
 def getOpts():
@@ -512,37 +624,64 @@ def getOpts():
         'See the level section in "man syslog" for a list of choices. You '
         'must use "--syslog" with this. [default: %default]')
 
-    gEmail.add_option('-M' , '--send-mail' , action='store_true' , 
+    gEmail.add_option('-M' , '--send-mail' , action='store_true' , dest='mail' ,
         default=False , help='Send an email from within cwrap itself.  This '
         'option is *required* if you wish to use the email options below.  '
         'Any other email options will be ignored if this option is not '
         'specified.  Note that this can be used with -N to disable normal '
         'output and just use cwrap to send an email [default: %default]')
     gEmail.add_option('-N' , '--suppress-normal-output' , action='store_true' ,
-        default=False , help='Suppress the normal output to STDOUT that would '
+        default=False , dest='suppressOutput' ,
+        help='Suppress the normal output to STDOUT that would '
         'normally cause crond to send an email.  This can *only* be specified '
         'if you are using cwrap to send an email (-M).  [default: %default]')
-    gEmail.add_option('-F' , '--email-from' , 
+    gEmail.add_option('-F' , '--email-from' , dest='mailFrom' ,
         default='%s@localhost.localdomain' % getpass.getuser() ,
         metavar='EMAIL_ADDR' , help='The email address to use as the sending '
         'address.  It is advised that you set this to a non-default. '
         '[default: %default]')
     gEmail.add_option('-R' , '--email-recipient' , action='append' , 
-        default=[] , metavar='EMAIL_ADDR' , help='The recipient(s) to send '
+        default=[] , dest='mailRecips' , metavar='EMAIL_ADDR' , 
+        help='The recipient(s) to send '
         'the email to. This option can be specified multiple times to send '
         'to multiple addresses [default: %default]')
+    gEmail.add_option('-J' , '--email-subject' , dest='mailSubject' ,
+        metavar='SUBJECT' , default='cwrap.py failure report' ,
+        help='The subject of the email to be sent [default: %default]')
     gEmail.add_option('-X' , '--smtp-server' , metavar='HOSTNAME|IP' ,
-        default='' , help='The SMTP server to use to send the email.  If '
+        default='' , dest='smtpServer' ,
+        help='The SMTP server to use to send the email.  If '
         'this option is not set, the local "sendmail" command will be used '
         'instead [default: %default]')
     gEmail.add_option('-T' , '--smtp-port' , type='int' , default=25 ,
-        metavar='INT' , help='The SMTP port to use [default: %default]')
+        metavar='INT' , dest='smtpPort' ,
+        help='The SMTP port to use [default: %default]')
+    gEmail.add_option('-L' , '--ssl' , action='store_true' , default=False ,
+        dest='smtpSSL' ,
+        help='Use SSL for the SMTP server connection [default: %default]')
+    gEmail.add_option('-Z' , '--starttls' , action='store_true' , 
+        dest='smtpTLS' , default=False , 
+        help='Use STARTTLS on the smtp connection [default: %default]')
+    gEmail.add_option('-U' , '--smtp-username' , default='' ,
+        dest='smtpUser' , metavar='USERNAME' , 
+        help='An SMTP username for auth SMTP [default: %default]')
+    gEmail.add_option('-W' , '--smtp-password' , default='' ,
+        dest='smtpPass' , metavar='PASSWORD' , 
+        help='A password for auth SMTP [default: %default]')
+    gEmail.add_option('-D' , '--smtp-creds-file' , default='' ,
+        dest='smtpCreds' , metavar='FILE' , 
+        help='If you don\'t want to specify your smtp '
+        'username and password on the command-line, you can specify a '
+        'credentials file instead.  All you should have in the file is: '
+        'USERNAME:PASSWORD [default: %default]')
 
     p.add_option_group(gState)
     p.add_option_group(gRetry)
     p.add_option_group(gFailure)
     p.add_option_group(gCommand)
     p.add_option_group(gSyslog)
+    p.add_option_group(gEmail)
+
     opts , cmdList = p.parse_args()
     if opts.version:
         print 'cwrap: %s' % __version__
@@ -576,6 +715,9 @@ def getOpts():
             'disable it')
     if not cmdList:
         p.error('You must specify a command to be executed')
+
+    handleEmailOpts(p , opts)
+
     return p.parse_args()
 
 def sigHandler(frame , num):
@@ -585,6 +727,16 @@ def sigHandler(frame , num):
 
 def log(msg):
     syslog.syslog(LOGPRI , msg)
+
+def findInPath(binary):
+    """
+    Searches the user's PATH for binary and returns the full path to it
+    """
+    for d in os.environ['PATH'].split(':'):
+        p = os.path.join(d , binary)
+        if os.path.exists(p):
+            return p
+    return None
 
 def main():
     global STATEFILE
