@@ -354,7 +354,7 @@ class CommandState(object):
                     (self.opts.fstFail and self.NumFails == 1):
                 sioFail = self._getFailText()
                 if self.opts.mail:
-                    self._sendMail(sioFail.getvalue())
+                    self._sendEmail(sioFail.getvalue())
                 if not self.opts.suppressOutput:
                     print sioFail.getvalue()
                 sioFail.close()
@@ -505,6 +505,7 @@ def handleEmailOpts(parser , opts):
                 'but I cannot find a sendmail binary in the PATH: %s' %
                 os.environ['PATH'])
         opts.sendmail = sendmail
+    return opts
 
 # Utility functions
 def getOpts():
@@ -544,7 +545,7 @@ def getOpts():
     gEmail = OptionGroup(p , 'Email Options' , 'If you wish to email other '
         'addresses than what is in your crontab, you can specify these here. '
         'You can also use an external SMTP server to send the email '
-        'instead of the local mailer.'
+        'instead of the local mailer.')
 
     p.add_option('-V' , '--version' , dest='version' , default=False ,
         action='store_true' ,
@@ -635,7 +636,7 @@ def getOpts():
         help='Suppress the normal output to STDOUT that would '
         'normally cause crond to send an email.  This can *only* be specified '
         'if you are using cwrap to send an email (-M).  [default: %default]')
-    gEmail.add_option('-F' , '--email-from' , dest='mailFrom' ,
+    gEmail.add_option('-E' , '--email-from' , dest='mailFrom' ,
         default='%s@localhost.localdomain' % getpass.getuser() ,
         metavar='EMAIL_ADDR' , help='The email address to use as the sending '
         'address.  It is advised that you set this to a non-default. '
@@ -716,9 +717,9 @@ def getOpts():
     if not cmdList:
         p.error('You must specify a command to be executed')
 
-    handleEmailOpts(p , opts)
+    opts = handleEmailOpts(p , opts)
 
-    return p.parse_args()
+    return (opts , cmdList)
 
 def sigHandler(frame , num):
     global STATEFILE
@@ -767,6 +768,7 @@ def main():
     if not comSt:
         comSt = CommandState(opts , cmdList)
     # Set any new command line opts
+    #import pdb ; pdb.set_trace()
     comSt.opts = opts
     comSt.run()
     comSt.cleanup()
