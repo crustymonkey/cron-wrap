@@ -154,6 +154,68 @@ Sets the priority for the syslog messages. See the level section in
 for a list of choices.  You must use 
 .B \-\-syslog
 with this. [default: LOG_INFO]
+.SS "Email Options"
+.TP 8
+.BR \-M ", " \-\-send\-mail
+Send an email from within cwrap itself.  This option
+is *required* if you wish to use the email options
+below.  Any other email options will be ignored if
+this option is not specified.  Note that this can be
+used with -N to disable normal output and just use
+cwrap to send an email [default: False]
+.TP
+.BR \-N ", " \-\-suppress\-normal\-output
+Suppress the normal output to STDOUT that would
+normally cause crond to send an email.  This can
+*only* be specified if you are using cwrap to send an
+email (
+.B \-M
+).  [default: False]
+.TP
+.BI \-E\  EMAIL_ADDR \fR,\ \fB\-\-email\-from= EMAIL_ADDR
+The email address to use as the sending address.  It
+is advised that you set this to a non-default as the default
+will be your user at localhost.localdomain
+.TP
+.BI \-R\  EMAIL_ADDR \fR,\ \fB\-\-email\-recipient= EMAIL_ADDR
+The recipient(s) to send the email to.  This options can 
+be specified multiple times to send to multiple addresses.
+.TP
+.BI \-J\  SUBJECT \fR,\ \fB\-\-email\-subject= SUBJECT
+The subject of the email to be sent [default: cwrap.py failure report]
+.TP
+.BI \-X\  HOSTNAME|IP \fR,\ \fB\-\-smtp\-server= HOSTNAME|IP
+The SMTP server to use to send the email.  If this option is not 
+set, the local "sendmail" command will be used instead.  Note that
+the sendmail command must be in your PATH!
+.TP
+.BI \-T\  INT \fR,\ \fB\-\-smtp\-port= INT
+The SMTP port to use [default: 25]
+.TP
+.BR \-L ", " \-\-ssl
+Use SSL for the SMTP server connection
+.TP
+.BR \-Z ", " \-\-starttls
+Use STARTTLS during the SMTP server connection
+.TP
+.BI \-U\  USERNAME \fR,\ \fB\-\-smtp\-username= USERNAME
+An SMTP username to use for auth SMTP.
+.TP
+.BI \-W\  PASSWORD \fR,\ \fB\-\-smtp\-password= PASSWORD
+A password to use with
+.B \-U
+for auth SMTP.  It is recommended that you use
+.B \-D
+instead and set tight read permissions on the creds file.  This
+is generally preferred instead of specifying a username and password
+on the command-line.
+.TP
+.BI \-D\  FILE \fR,\ \fB\-\-smtp\-creds\-file= FILE
+This is recommended instead of specifying a username and password on the
+command-line when using authenticated SMTP to send email.  That way you
+can set read only access for the user running cwrap and not have to
+expose the username and password.  All you should have in your creds. 
+file is: USERNAME:PASSWORD
 .SH EXAMPLE
 Here is a short example of how you would run a cron job with
 .I cwrap.py.
@@ -170,13 +232,23 @@ the 10th consecutive failure (-n 10).  This script can take a while to run so
 I want any other runs to retry two times (-r 2), but if it wasn't able to run
 because another instance was running, I don't want to hear about it (-i).  I
 also don't want to see any normal output from it, but just when it fails (-q).
-Last, I want
+I also want
 .B all
-errors to be logged to syslog (-S) under LOCAL1 (-C LOG_LOCAL1).  Here would
-be the example:
+errors to be logged to syslog (-S) under LOCAL1 (-C LOG_LOCAL1).  
+.PP
+On top of
+that, I want to send an email to (-R bob@example.com) and (-R susie@example.com)
+with the same output that is going to the configure cron email address.
+To do that we specify that we will send an email from cwrap itself (-M) 
+and we are going to connect to the local relay server to send the email 
+(-X 192.168.0.2) with the subject set to a custom string (-J "widget failure detected") and this will have the sender email address set 
+(-E widget@example.com) and finally, we will do all of this securely with
+STARTTLS (-Z). Here would be the example:
 .PP
 .nf
-cwrap.py -fSiq -n 10 -r 2 -C LOG_LOCAL1 cron.sh -a do_stuff
+cwrap.py -fSiqMZ -n 10 -r 2 -C LOG_LOCAL1 -R bob@example.com \\
+    -R susie@example.com -J "widget failure detected" \\
+    -E widget@example.com -X 192.168.0.2 cron.sh -a do_stuff
 .fi
 .SH AUTHOR
 Jay Deiman (admin (at) splitstreams.com)
