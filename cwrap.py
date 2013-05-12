@@ -372,7 +372,7 @@ class CommandState(object):
             sio.write('the option to print a report for the first fail '
                 'is set.\n')
         else:
-            sio.write('The specified number of failures, %d,' % 
+            sio.write('The specified number of failures, %d, ' % 
                 self.opts.numFails)
             sio.write('has been reached for the following\n')
             sio.write('command which has failed %d times in a row:' % 
@@ -426,9 +426,10 @@ class CommandState(object):
         """
         cmd = [self.opts.sendmail , '-f' , self.opts.mailFrom]
         cmd.extend(self.opts.mailRecips)
-        p = sp.Popen(cmd , stdout=sp.PIPE , stderr=sp.PIPE)
+        p = sp.Popen(cmd , stdin=sp.PIPE , stdout=sp.PIPE , stderr=sp.PIPE)
         stdout , stderr = p.communicate(failText)
         if p.returncode != 0:
+            print >> sys.stderr , 'Mail error: \n%s\n%s' % (stdout , stderr)
             raise MailError('Error sending email with "sendmail":\n'
                 'STDOUT:\n%s\nSTDERR:\n%s\n' % (stdout , stderr))
 
@@ -499,13 +500,12 @@ def handleEmailOpts(parser , opts):
         parser.error('You cannot specify both SSL and TLS for email')
     if not opts.smtpServer:
         # Get the sendmail binary
-        sendmail = findInPath('sendmail')
+        sendmail = findInPath(opts , 'sendmail')
         if sendmail is None:
             parser.error('You have specified that cwrap is to send email, '
                 'but I cannot find a sendmail binary in the PATH: %s' %
                 os.environ['PATH'])
         opts.sendmail = sendmail
-    return opts
 
 # Utility functions
 def getOpts():
@@ -561,6 +561,7 @@ def getOpts():
         '2 different scripts, or the same script with different command-line '
         'opts, that cannot run at the same time. '
         '[default: <auto-gen lockfile>]')
+
     gRetry.add_option('-r' , '--num-retries' , dest='numRetries' , type='int' ,
         default=0 , metavar='INT' , 
         help='The number of times to retry this if a previous instance is '
@@ -577,6 +578,7 @@ def getOpts():
         'while a previous instance was still running.  Basically, an error '
         'will not be printed if the number of run retries are exceeded. '
         '[default: %default]')
+
     gFailure.add_option('-n' , '--num-fails' , dest='numFails' , type='int' ,
         default=1 , metavar='INT' ,
         help='The number of consecutive failures that must occur '
@@ -717,7 +719,7 @@ def getOpts():
     if not cmdList:
         p.error('You must specify a command to be executed')
 
-    opts = handleEmailOpts(p , opts)
+    handleEmailOpts(p , opts)
 
     return (opts , cmdList)
 
@@ -729,11 +731,11 @@ def sigHandler(frame , num):
 def log(msg):
     syslog.syslog(LOGPRI , msg)
 
-def findInPath(binary):
+def findInPath(opts , binary):
     """
     Searches the user's PATH for binary and returns the full path to it
     """
-    for d in os.environ['PATH'].split(':'):
+    for d in opts.PATH.split(':'):
         p = os.path.join(d , binary)
         if os.path.exists(p):
             return p
@@ -768,7 +770,6 @@ def main():
     if not comSt:
         comSt = CommandState(opts , cmdList)
     # Set any new command line opts
-    #import pdb ; pdb.set_trace()
     comSt.opts = opts
     comSt.run()
     comSt.cleanup()
