@@ -26,7 +26,7 @@ import sys , time , os , signal , syslog , getpass
 DEBUG = False
 STATEFILE = None
 LOGPRI = 0
-__version__ = '0.5.0'
+__version__ = '0.5.1'
 
 # File creation error exit code
 E_FC = 1
