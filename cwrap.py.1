@@ -154,6 +154,15 @@ Sets the priority for the syslog messages. See the level section in
 for a list of choices.  You must use 
 .B \-\-syslog
 with this. [default: LOG_INFO]
+.TP
+.BR \-O ", " \-\-num\-fails\-only
+Only log an item when the number of failures is reached. 
+Normally, 
+.B all 
+failures are logged, but you can use this option to 
+only write to syslog only when 
+.B \-\-num\-fails
+is reached [default: False]
 .SS "Email Options"
 .TP 8
 .BR \-M ", " \-\-send\-mail
@@ -255,4 +264,4 @@ Jay Deiman (admin (at) splitstreams.com)
 .PP
 http://stuffivelearned.org
 .SH SEE ALSO
-cron(8), crontab(1), crontab(5)
+cron(8), crontab(1), crontab(5), syslog(3)

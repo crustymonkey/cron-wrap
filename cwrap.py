@@ -437,6 +437,11 @@ class CommandState(object):
         """
         Logs the failure to syslog
         """
+        if self.opts.sNumOnly and (self.NumFails % self.opts.numFails != 0 or \
+                (self.opts.fstFail and self.NumFails != 1)):
+            # Basically, if we only want to log when we've hit the number
+            # of failures and we haven't hit that mark, we return
+            return
         msg = 'CMD: %s; EXIT: %d; RUNTIME: %.02f; ' % (fail.command , 
             fail.exitCode , fail.runTime)
         if fail.pyError:
@@ -610,6 +615,7 @@ def getOpts():
         help='Only output error reports.  If the command runs successfully, '
         'nothing will be printed, even if the command had stdout or stderr '
         'output. [default: %default]')
+    
     gSyslog.add_option('-S' , '--syslog' , dest='syslog' , default=False ,
         action='store_true' ,
         help='Turn on syslogging.  This will log *all* failures to syslog. '
@@ -626,6 +632,12 @@ def getOpts():
         default='LOG_INFO' , help='Sets the priority for the syslog messages. '
         'See the level section in "man syslog" for a list of choices. You '
         'must use "--syslog" with this. [default: %default]')
+    gSyslog.add_option('-O' , '--num-fails-only' , dest='sNumOnly' ,
+        action='store_true' , default=False ,
+        help='Only log an item when the number of failures is reached. '
+        'Normally, *all* failures are logged, but you can use this option to '
+        'only write to syslog only when --num-fails is reached '
+        '[default: %default]')
 
     gEmail.add_option('-M' , '--send-mail' , action='store_true' , dest='mail' ,
         default=False , help='Send an email from within cwrap itself.  This '
