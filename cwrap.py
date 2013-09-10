@@ -437,8 +437,9 @@ class CommandState(object):
         """
         Logs the failure to syslog
         """
-        if self.opts.sNumOnly and (self.NumFails % self.opts.numFails != 0 or \
-                (self.opts.fstFail and self.NumFails != 1)):
+        if self.opts.sNumOnly and not \
+                (self.NumFails % self.opts.numFails == 0 or \
+                (self.opts.fstFail and self.NumFails == 1)):
             # Basically, if we only want to log when we've hit the number
             # of failures and we haven't hit that mark, we return
             return
