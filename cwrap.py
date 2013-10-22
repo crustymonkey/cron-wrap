@@ -261,6 +261,8 @@ class CommandState(object):
         self.cmdList = cmdList
         self._reset()
         self._ph = None
+        # This is used for calculating backoffs
+        self._lastEmailNum = 0
 
     def getNumFails(self):
         return len(self.failures)
@@ -350,8 +352,19 @@ class CommandState(object):
         if self.opts.syslog:
             self._logFail(f)
         if self.NumFails:
-            if self.NumFails % self.opts.numFails == 0 or \
-                    (self.opts.fstFail and self.NumFails == 1):
+            sendEmail = False
+            # Determine whether it's time to send an email.  Multiple
+            # if statements here make this much more readable than one
+            # giant decision
+            if self.NumFails % self.opts.numFails == 0 and \
+                    not (self.opts.backoff and self._lastEmailNum > 0):
+                sendEmail = True
+            if self.opts.fstFail and self.NumFails == 1:
+                sendEmail = True
+            if self.opts.backoff and self.NumFails == self._lastEmailNum * 2:
+                sendEmail = True
+            if sendEmail:
+                self._lastEmailNum = self.NumFails
                 sioFail = self._getFailText()
                 if self.opts.mail:
                     self._sendEmail(sioFail.getvalue())
@@ -594,6 +607,13 @@ def getOpts():
         help='The default is to print a failure report only when a multiple '
         'of the failure threshold is reached. If this is set, an email will '
         '*also* be sent on the first failure. [default: %default]')
+    gFailure.add_option('-b' , '--backoff' , dest='backoff' , 
+        action='store_true' , default=False ,
+        help='Instead of sending an email out every "-n" failures, if this is '
+        'set, emails will be sent out at an exponentially decaying rate.  '
+        'If you set the num fails to 3, then an email would be sent at 3 '
+        'fails, 6 fails, 12 fails, 24 fails, etc. [default: %default]')
+
     gCommand.add_option('-p' , '--path' , dest='PATH' , 
         default=os.environ['PATH'] , metavar='CMD_PATH' ,
         help='Use this for command path instead of the environment $PATH. '
