@@ -93,6 +93,15 @@ be printed on the first failure.  Note that this really only matters if
 you set the
 .B \-\-num\-fails
 greater than 1.  [default: False]
+.TP
+.BR \-b ", " \-\-backoff
+Instead of sending an email out every
+.B \-\-num\-fails
+failures, if this is set, emails will be sent out at an exponentially 
+decaying rate.  Example: if you set the
+.B \-\-num\-fails
+to 3, then an email would be sent at 3 fails, 6 fails, 12 fails, etc. 
+[default: False]
 .SS "Command Options"
 .TP 8
 .BI \-p\  CMD_PATH \fR,\ \fB\-\-path= CMD_PATH
