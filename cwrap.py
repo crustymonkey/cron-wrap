@@ -359,12 +359,14 @@ class CommandState(object):
             if self.NumFails % self.opts.numFails == 0 and \
                     not (self.opts.backoff and self._lastEmailNum > 0):
                 sendEmail = True
+                self._lastEmailNum = self.NumFails
             if self.opts.fstFail and self.NumFails == 1:
                 sendEmail = True
-            if self.opts.backoff and self.NumFails == self._lastEmailNum * 2:
+            if self.opts.backoff and self.NumFails == self._lastEmailNum * 2 \
+                    and self.NumFails % self.opts.numFails == 0:
                 sendEmail = True
-            if sendEmail:
                 self._lastEmailNum = self.NumFails
+            if sendEmail:
                 sioFail = self._getFailText()
                 if self.opts.mail:
                     self._sendEmail(sioFail.getvalue())
