@@ -88,6 +88,8 @@ class StateFile(file):
         except Exception , e:
             # Can't unpickle for some reason, create a new state
             pass
+        # Handle any upgrade changes
+        self._upgrade(obj)
         return obj
 
     def saveObject(self , obj):
@@ -99,6 +101,12 @@ class StateFile(file):
         self.truncate(0)
         pickle.dump(obj , self)
 
+    def _upgrade(self , cmdState):
+        # Upgrading from 0.5.x to 0.6.x adds the _lastEmailNum var.  If it
+        # doesn't exist, we need to initialize it to zero
+        if not hasattr(cmdState , '_lastEmailNum'):
+            cmdState._lastEmailNum = 0
+        
     def _create(self , fname):
         if not os.path.exists(fname):
             # Basically "touch" the file
