@@ -26,7 +26,7 @@ import sys , time , os , signal , syslog , getpass
 DEBUG = False
 STATEFILE = None
 LOGPRI = 0
-__version__ = '0.6.1'
+__version__ = '0.6.2'
 
 # File creation error exit code
 E_FC = 1
@@ -104,7 +104,8 @@ class StateFile(file):
     def _upgrade(self , cmdState):
         # Upgrading from 0.5.x to 0.6.x adds the _lastEmailNum var.  If it
         # doesn't exist, we need to initialize it to zero
-        if not hasattr(cmdState , '_lastEmailNum'):
+        if isinstance(cmdState , CommandState) and not \
+            hasattr(cmdState , '_lastEmailNum'):
             cmdState._lastEmailNum = 0
         
     def _create(self , fname):
