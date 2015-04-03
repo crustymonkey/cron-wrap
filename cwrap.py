@@ -19,6 +19,7 @@ from optparse import OptionParser , OptionValueError , OptionGroup
 from hashlib import md5
 from cStringIO import StringIO
 from smtplib import SMTP , SMTP_SSL
+from random import randint
 import cPickle as pickle
 import subprocess as sp
 import sys , time , os , signal , syslog , getpass
@@ -26,7 +27,7 @@ import sys , time , os , signal , syslog , getpass
 DEBUG = False
 STATEFILE = None
 LOGPRI = 0
-__version__ = '0.6.2'
+__version__ = '0.6.3'
 
 # File creation error exit code
 E_FC = 1
@@ -290,6 +291,8 @@ class CommandState(object):
         """
         Performs this run and prints an error report if necessary.
         """
+        if self.opts.fuzz:
+            time.sleep(randint(0, self.opts.fuzz))
         start = self.lastRunStartTime = time.time()
         stdout = ''
         stderr = ''
@@ -642,6 +645,12 @@ def getOpts():
         metavar='INT' , default=0 , type='int' ,
         help='The number of seconds to allow the command to run before '
         'terminating.  Set to zero to disable timeouts. [default: %default]')
+    gCommand.add_option('-z', '--fuzz', dest='fuzz', metavar='INT',
+        type='int', default=0, help='This will add a random sleep between 0 '
+        'and N seconds before executing the command.  Note that the '
+        '--timeout is only valid in regards to when the command is actually '
+        'run.  To calculate run time, you should add timeout + fuzz + '
+        'command run time [default: %default]')
     gCommand.add_option('-q' , '--quiet' , dest='quiet' , default=False ,
         action='store_true' ,
         help='Only output error reports.  If the command runs successfully, '
@@ -759,6 +768,9 @@ def getOpts():
         p.error('Retry seconds cannot be less than 1')
     if opts.timeout < 0:
         p.error('Command timeout must be set to a positive integer or zero to'
+            'disable it')
+    if opts.fuzz < 0:
+        p.error('The fuzz time must be a positive integer, or zero to '
             'disable it')
     if not cmdList:
         p.error('You must specify a command to be executed')

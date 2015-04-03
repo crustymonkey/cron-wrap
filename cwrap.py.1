@@ -131,6 +131,13 @@ will allow the command to run before
 .I cwrap.py
 terminates it.  The default is to let it run forever. [default: 0]
 .TP
+.BI \-z\  INT \fR,\ \fB\-\-fuzz= INT
+This will add a random sleep between 0 and N seconds
+before executing the command.  Note that the --timeout
+is only valid in regards to when the command is
+actually run.  To calculate run time, you should add
+timeout + fuzz + command run time [default: 0]
+.TP
 .BR \-q ", " \-\-quiet
 Only output error reports.  If this is set and the command runs successfully, 
 nothing will be printed, even if the command had stdout or stderr output. 
