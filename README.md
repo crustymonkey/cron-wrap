@@ -1,5 +1,11 @@
 # cron-wrap #
 
+## Rust Version Available ##
+If you would like an updated version of this, there is a version I've rewritten
+in Rust.  It has some small improvements in the handling of lockfiles (they
+are in /dev/shm by default now), but is generally the same functionality as
+cron-wrap.  You can find it [here](https://github.com/crustymonkey/rust-cwrap).
+
 ## ABOUT ##
 "Obviously, you're not a golfer".  But you are probably a sysadmin.
 
